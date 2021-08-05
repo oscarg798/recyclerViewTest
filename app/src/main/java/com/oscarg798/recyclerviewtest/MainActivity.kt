@@ -1,30 +1,86 @@
 package com.oscarg798.recyclerviewtest
 
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.TextView
+import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
+
+    private val data = listOf(
+        Data(0, "oscar", "gallon", "rosero"),
+        Data(1, "stephany", "berrio", "alzate"),
+        Data(2, "nicolas", "gallon", "berrio"),
+        Data(3, "matias", "gallon", "berrio")
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        val rv = findViewById<RecyclerView>(R.id.rv)
-        rv.layoutManager = LinearLayoutManager(this)
-        val data = listOf(
-            Data(0, "oscar", "gallon", "rosero"),
-            Data(1, "stephany", "berrio", "alzate"),
-            Data(2, "nicolas", "gallon", "berrio"),
-            Data(3, "matias", "gallon", "berrio")
-        )
-        rv.adapter = MyAdapter(data.toMutableList()) {
-            (rv.adapter as MyAdapter).updateItem(it.copy(expanded = !it.expanded))
+        setContent {
+            val dataSet = remember { mutableStateOf(data) }
+
+            val onDataClicked: (Data) -> Unit = { dataItem ->
+                val mutableData = dataSet.value.toMutableList()
+                val itemIndex = mutableData.indexOfFirst { it.id == dataItem.id }
+                mutableData.removeAt(itemIndex)
+                mutableData.add(itemIndex, dataItem.copy(expanded = !dataItem.expanded))
+                dataSet.value = mutableData
+            }
+
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(dataSet.value) { item ->
+                    if (item.expanded) {
+                        ExpandedView(item, onDataClicked)
+                    } else {
+                        CollapsedView(item, onDataClicked)
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+fun ViewContainer(
+    data: Data,
+    onClickListener: (Data) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        Modifier
+            .padding(16.dp)
+            .clickable { onClickListener(data) }) {
+        content()
+    }
+}
+
+@Composable
+fun ExpandedView(data: Data, onClickListener: (Data) -> Unit) {
+    ViewContainer(data = data, onClickListener = onClickListener) {
+        Text(data.title)
+        Text(data.subtitle)
+        Text(data.description)
+    }
+}
+
+@Composable
+fun CollapsedView(data: Data, onClickListener: (Data) -> Unit) {
+    ViewContainer(data = data, onClickListener = onClickListener) {
+        Text(data.title)
     }
 }
 
@@ -35,67 +91,3 @@ data class Data(
     val description: String,
     val expanded: Boolean = false
 )
-
-class MyAdapter(
-    private val data: MutableList<Data>,
-    private val onClickListener: (Data) -> Unit
-) : RecyclerView.Adapter<CommonViewHolder>() {
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CommonViewHolder {
-       return  when (viewType) {
-            0 -> ExpandedViewHolder(
-                LayoutInflater.from(parent.context).inflate(R.layout.item_expanded, parent, false)
-            )
-            else -> CollapsedViewHolder(
-                LayoutInflater.from(parent.context).inflate(R.layout.item_collapsed, parent, false)
-            )
-
-        }
-    }
-
-    override fun onBindViewHolder(holder: CommonViewHolder, position: Int) {
-        holder.bind(data = data[position], onClickListener = onClickListener)
-    }
-
-    override fun getItemCount(): Int {
-        return data.size
-    }
-
-    fun updateItem(item: Data) {
-        val itemIndex = data.indexOfFirst { it.id == item.id }
-        data.removeAt(itemIndex)
-        data.add(itemIndex, item)
-        notifyItemChanged(itemIndex)
-    }
-
-    override fun getItemViewType(position: Int): Int {
-        return if (data[position].expanded) {
-            0
-        } else {
-            1
-        }
-    }
-}
-
-abstract class CommonViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-
-    abstract fun bind(data: Data, onClickListener: (Data) -> Unit)
-}
-
-class CollapsedViewHolder(itemView: View) : CommonViewHolder(itemView) {
-
-    override fun bind(data: Data, onClickListener: (Data) -> Unit) {
-        itemView.findViewById<TextView>(R.id.tvTitle).text = data.title
-        itemView.setOnClickListener { onClickListener(data) }
-    }
-}
-
-class ExpandedViewHolder(itemView: View) : CommonViewHolder(itemView) {
-
-    override fun bind(data: Data, onClickListener: (Data) -> Unit) {
-        itemView.findViewById<TextView>(R.id.tvTitle).text = data.title
-        itemView.findViewById<TextView>(R.id.tvSubtitle).text = data.subtitle
-        itemView.findViewById<TextView>(R.id.tvDescription).text = data.description
-        itemView.setOnClickListener { onClickListener(data) }
-    }
-}
